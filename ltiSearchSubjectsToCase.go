@@ -19,13 +19,15 @@ type Subject struct {
 	Name       string `json:"name"`
 }
 
+// CFItems struct
 type CFItems struct {
 	CFItems []CFItem
 }
 
+// CFItem struct
 type CFItem struct {
 	Identifier        string
-	Uri               string
+	URI               string
 	HumanCodingScheme string
 }
 
@@ -40,9 +42,9 @@ func subjectsToCFItems(subjects Subjects) CFItems {
 }
 
 func main() {
-
+	var err error
 	// Open our jsonFile
-	baseName := "subjects"
+	baseName := "math"
 	if len(os.Args) > 1 {
 		baseName = os.Args[1]
 	}
@@ -71,4 +73,9 @@ func main() {
 	var cfItems CFItems
 	cfItems = subjectsToCFItems(subjects)
 	fmt.Printf("%d CFItems loaded\n", len(cfItems.CFItems))
+
+	jsonPayload := []byte("INIT")
+	jsonPayload, err = json.Marshal(cfItems)
+	s := string(jsonPayload[:])
+	fmt.Printf("JSON payload: %s\n", s)
 }
