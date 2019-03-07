@@ -43,22 +43,14 @@ type CFItems struct {
 
 // CFItem struct
 type CFItem struct {
-	Identifier        string
-	URI               string
-	HumanCodingScheme string
+	URI              	string `json:"uri"`
+	HumanCodingScheme	string `json:"humanCodingScheme"`
+	CFDocumentURI		string `json:"CFDocumentURI"`
+	Identifier			string `json:"identifier"`
+	LastChangeDateTime	string `json:"lastChangeDateTime"`
+	OldID 				string 
+	OldParent			string 
 }
-
-const ( // iota is reset to 0
-	isChildOf     = iota
-	isPeerOf      = iota
-	isPartOf      = iota
-	exactMatchOf  = iota
-	precedes      = iota
-	isRelatedTo   = iota
-	replacedBy    = iota
-	exemplar      = iota
-	hasSkillLevel = iota
-)
 
 // LinkGenURI struct
 type LinkGenURI struct {
@@ -71,7 +63,7 @@ type LinkGenURI struct {
 type CFAssociation struct {
 	OriginNodeURI      LinkGenURI
 	DestinationNodeURI LinkGenURI
-	AssociationType    int
+	AssociationType    string
 }
 
 // CFAssociations struct
@@ -87,22 +79,47 @@ func (m *CFItems) loadSubjects(subjects Subjects, uriPrefix string) int {
 		if err != nil {
 			fmt.Println("Can't create GUID")
 		}
+		
 		cfItem.Identifier = id.String()
 		cfItem.HumanCodingScheme = v.Name
 		cfItem.URI = uriPrefix + "/" + id.String()
+		cfItem.LastChangeDateTime = time.Now().Format("YYYY-MM-DDThh:mm:ss")
 		m.CFItems[v.Identifier] = cfItem
 	}
 	return len(m.CFItems)
 }
 
-func (m *CFAssociations) loadChildCFAssociations(subjects Subjects, uriPrefix string) int {
+// FindOldID method
+func (m *CFItems) FindOldID(oldID string) string {
+	for _, v := range m.CFItems {
+		if (oldID == v.OldID) {
+			return v.Identifier
+		}
+	}
+	return ""
+}
+
+// FindOldParent method
+func (m *CFItems) FindOldParent(oldParent string) string {
+	for _, v := range m.CFItems {
+		if (oldParent == v.OldParent) {
+			return v.Identifier
+		}
+	}
+	return ""	
+}
+
+
+func (m *CFAssociations) loadChildren(subjects Subjects,cfItems CFItems, uriPrefix string) int {
 	for _, v := range subjects.Subjects {
 		var orgURI, destURI LinkGenURI
-
-		orgURI.Identifier = uuid.Must(uuid.NewV4()).String()
-		orgURI.URI = uriPrefix + "/" + v.Identifier
-		association := CFAssociation{OriginNodeURI: orgURI, DestinationNodeURI: destURI, AssociationType: isChildOf}
-		m.CFAssociations = append(m.CFAssociations, association)
+		orgURI.URI = cfItems.FindOldID(v.Identifier)
+		destURI.URI =  cfItems.FindOldParent(v.Parent)
+		var cfAssociation CFAssociation
+		cfAssociation.OriginNodeURI=orgURI
+		cfAssociation.DestinationNodeURI=destURI
+		cfAssociation.AssociationType="isChildOf"
+		m.CFAssociations = append(m.CFAssociations, cfAssociation)
 	}
 	return len(m.CFAssociations)
 }
@@ -183,7 +200,7 @@ func main() {
 	count := cfItems.loadSubjects(subjects, uriPrefix)
 	fmt.Printf("Finished loading %d subjects\n", count)
 	var cfAssociations CFAssociations
-	cfAssociations.loadChildCFAssociations(subjects, uriPrefix)
+	cfAssociations.loadChildren(subjects,cfItems, uriPrefix)
 
 	var cfDocument CFDocument
 	cfDocument.Init(uriPrefix, baseName)
