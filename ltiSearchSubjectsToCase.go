@@ -43,27 +43,25 @@ type CFItems struct {
 
 // CFItem struct
 type CFItem struct {
-	URI              	string `json:"uri"`
-	HumanCodingScheme	string `json:"humanCodingScheme"`
-	CFDocumentURI		string `json:"CFDocumentURI"`
-	Identifier			string `json:"identifier"`
-	LastChangeDateTime	string `json:"lastChangeDateTime"`
-	OldID 				string 
-	OldParent			string 
+	URI                string `json:"uri"`
+	HumanCodingScheme  string `json:"humanCodingScheme"`
+	CFDocumentURI      string `json:"CFDocumentURI"`
+	Identifier         string `json:"identifier"`
+	LastChangeDateTime string `json:"lastChangeDateTime"`
 }
 
 // LinkGenURI struct
 type LinkGenURI struct {
-	Title      string
-	Identifier string
-	URI        string
+	Title      string `json:"title"`
+	Identifier string `json:"identifier"`
+	URI        string `json:"uri"`
 }
 
 // CFAssociation struct
 type CFAssociation struct {
-	OriginNodeURI      LinkGenURI
-	DestinationNodeURI LinkGenURI
-	AssociationType    string
+	OriginNodeURI      LinkGenURI `json:"originNodeURI"`
+	DestinationNodeURI LinkGenURI `json:"destinationNodeURI"`
+	AssociationType    string	  `json:"associationType"`
 }
 
 // CFAssociations struct
@@ -79,7 +77,7 @@ func (m *CFItems) loadSubjects(subjects Subjects, uriPrefix string) int {
 		if err != nil {
 			fmt.Println("Can't create GUID")
 		}
-		
+
 		cfItem.Identifier = id.String()
 		cfItem.HumanCodingScheme = v.Name
 		cfItem.URI = uriPrefix + "/" + id.String()
@@ -91,8 +89,9 @@ func (m *CFItems) loadSubjects(subjects Subjects, uriPrefix string) int {
 
 // FindOldID method
 func (m *CFItems) FindOldID(oldID string) string {
-	for _, v := range m.CFItems {
-		if (oldID == v.OldID) {
+	for k, v := range m.CFItems {
+		if oldID == k {
+			//fmt.Printf("Comparing %s: %s\n", k, oldID)
 			return v.Identifier
 		}
 	}
@@ -101,24 +100,29 @@ func (m *CFItems) FindOldID(oldID string) string {
 
 // FindOldParent method
 func (m *CFItems) FindOldParent(oldParent string) string {
-	for _, v := range m.CFItems {
-		if (oldParent == v.OldParent) {
+	for k, v := range m.CFItems {
+		if oldParent == k {
+			//fmt.Printf("Comparing %s to %s\n", k, oldParent)
 			return v.Identifier
 		}
 	}
-	return ""	
+	return ""
 }
 
-
-func (m *CFAssociations) loadChildren(subjects Subjects,cfItems CFItems, uriPrefix string) int {
+func (m *CFAssociations) loadChildren(subjects Subjects, cfItems CFItems, uriPrefix string) int {
 	for _, v := range subjects.Subjects {
-		var orgURI, destURI LinkGenURI
-		orgURI.URI = cfItems.FindOldID(v.Identifier)
-		destURI.URI =  cfItems.FindOldParent(v.Parent)
+		var orgURI LinkGenURI
+		var destURI LinkGenURI
+		orgURI.Identifier = cfItems.FindOldID(v.Identifier)
+		orgURI.URI =  uriPrefix + "/" + orgURI.Identifier
+		orgURI.Title = v.Name
+		destURI.Identifier = cfItems.FindOldParent(v.Parent)
+		destURI.URI = uriPrefix + "/" + destURI.Identifier
+		destURI.Title = v.Name
 		var cfAssociation CFAssociation
-		cfAssociation.OriginNodeURI=orgURI
-		cfAssociation.DestinationNodeURI=destURI
-		cfAssociation.AssociationType="isChildOf"
+		cfAssociation.OriginNodeURI = orgURI
+		cfAssociation.DestinationNodeURI = destURI
+		cfAssociation.AssociationType = "isChildOf"
 		m.CFAssociations = append(m.CFAssociations, cfAssociation)
 	}
 	return len(m.CFAssociations)
@@ -200,7 +204,7 @@ func main() {
 	count := cfItems.loadSubjects(subjects, uriPrefix)
 	fmt.Printf("Finished loading %d subjects\n", count)
 	var cfAssociations CFAssociations
-	cfAssociations.loadChildren(subjects,cfItems, uriPrefix)
+	cfAssociations.loadChildren(subjects, cfItems, uriPrefix)
 
 	var cfDocument CFDocument
 	cfDocument.Init(uriPrefix, baseName)
