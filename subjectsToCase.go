@@ -1,4 +1,4 @@
-// subjectsToCase.go
+// subjectsToCASE.go
 //
 // Loads JSON file with a subject taxonomy expressed in IMS Global LTI Resource Search
 // Subjects taxonomy payload format
@@ -9,7 +9,7 @@
 // Generates <basename>_case.json file
 //
 // Usage:
-//		go run subjectsToCase.go <subjects basename file> <base URI to use>
+//		go run subjectsToCASE.go <subjects basename file> <base URI to use>
 //
 package main
 
@@ -19,6 +19,7 @@ import (
 	"io/ioutil"
 	"os"
 	"time"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/gocarina/gocsv"
 	"github.com/gofrs/uuid"
@@ -64,9 +65,10 @@ type CFItem struct {
 	HumanCodingScheme  string `json:"humanCodingScheme"`
 	CFDocumentURI      string `json:"CFDocumentURI"`
 	Identifier         string `json:"identifier"`
-	LastChangeDateTime string `json:"lastChangeDateTime"`
+	FullStatement	   string `json:"fullStatement"`
 	ConceptKeywords    string `json:"conceptKeywords"`
 	EducationLevel     string `json:"educationLevel"`
+	LastChangeDateTime string `json:"lastChangeDateTime"`
 }
 
 // LinkGenURI struct
@@ -98,7 +100,11 @@ func (m *CFItems) loadSubjects(subjects Subjects, uriPrefix string, cfDocumentUR
 		}
 
 		cfItem.Identifier = id.String()
+		if (len(v.Name)<1) {
+			v.Name = "(Unknown)"
+		}
 		cfItem.HumanCodingScheme = v.Name
+		cfItem.FullStatement = v.Name
 		cfItem.URI = uriPrefix + "/" + id.String()
 		cfItem.CFDocumentURI = cfDocumentURI
 		cfItem.LastChangeDateTime = time.Now().Format("YYYY-MM-DDThh:mm:ss")
@@ -107,6 +113,8 @@ func (m *CFItems) loadSubjects(subjects Subjects, uriPrefix string, cfDocumentUR
 	return len(m.CFItems)
 }
 
+// uses the supplementary subject info in the CSV to add additional metadata on each CFItem
+// currently populating ConceptKeywords and EducationLevel
 func (m *CFItems) loadSubjectsInfo(subjectsInfo SubjectsInfo, subjects Subjects) {
 	var i CFItem 
 	for _, v := range subjectsInfo.SubjectsInfo {
@@ -117,6 +125,8 @@ func (m *CFItems) loadSubjectsInfo(subjectsInfo SubjectsInfo, subjects Subjects)
 	}
 }
 
+// creates CASE isChildOf CFAssociations based on the parent-child relationships in the subject taxoonomy
+// returns the number of associations created
 func (m *CFAssociations) loadChildren(subjects Subjects, cfItems CFItems, uriPrefix string) int {
 	for _, v := range subjects.Subjects {
 		var orgURI LinkGenURI
@@ -187,48 +197,50 @@ func main() {
 	jsonFile, err := os.Open(subjectsJSONFileName)
 	// if we os.Open returns an error then handle it
 	if err != nil {
-		fmt.Println(err)
+		log.WithFields(log.Fields{"file": subjectsJSONFileName}).Fatal("Can't find specified file")
 	} else {
-		fmt.Printf("Successfully opened %s\n", subjectsJSONFileName)
+		log.WithFields(log.Fields{"file": subjectsJSONFileName}).Info("Opened file")
 	}
 	// defer the closing of our jsonFile so that we can parse it later on
 	defer jsonFile.Close()
-
-	// read our opened xmlFile as a byte array.
+	// read our opened jsonfile as a byte array.
 	byteValue, _ := ioutil.ReadAll(jsonFile)
-
 	var subjects Subjects
 	// we unmarshal our byteArray which contains our
 	// jsonFile's content into subjects which we defined above
 	json.Unmarshal(byteValue, &subjects)
 
-	// now set a base name for all the URI identifiers
+	// second argument is base URI to be used for URI identifiers
+	// default if nto provided is frameworks.act.org
 	baseURI := "http://frameworks.act.org"
 	if len(os.Args) > 2 {
 		baseURI = os.Args[2]
 	}
-	caseSuffix := "/ims/case/v1/p0"
+	caseSuffix := "/ims/case/v1p0" // current version of the  case spec
 	uriPrefix := baseURI + caseSuffix
 	var cfDocument CFDocument
 	cfDocument.Init(uriPrefix, baseName)
 	var cfItems CFItems
 	count := cfItems.loadSubjects(subjects, uriPrefix, cfDocument.URI)
-	fmt.Printf("Finished loading %d subjects\n", count)
+	log.WithFields(log.Fields{"count": count}).Info("Loaded subjects")
 
+	// load supplementary information about subjects from CSV file 
 	subjectsInfoFileName := baseName + ".csv"
 	subjectsInfoFile, err := os.OpenFile(subjectsInfoFileName, os.O_RDWR|os.O_CREATE, os.ModePerm)
 	if err != nil {
-		panic(err)
+		log.WithFields(log.Fields{"file": subjectsInfoFileName}).Error("Failed to open supplementary file")
+	} else {
+		defer subjectsInfoFile.Close()
+		var subjectsInfo SubjectsInfo
+		if err := gocsv.UnmarshalFile(subjectsInfoFile, &subjectsInfo.SubjectsInfo); err != nil { // Load subjects info from file
+			log.WithFields(log.Fields{"file": subjectsInfoFileName}).Error("Failed to parse supplementary file")
+		} else {
+			log.WithFields(log.Fields{"count": count}).Info("Loaded supplementary subject info")
+			// use the subjectsInfo array (from .csv file)
+			// to populate the cfItems conceptKeywords and educationLevel fields
+			cfItems.loadSubjectsInfo(subjectsInfo, subjects)
+		}
 	}
-	defer subjectsInfoFile.Close()
-	var subjectsInfo SubjectsInfo
-	if err := gocsv.UnmarshalFile(subjectsInfoFile, &subjectsInfo.SubjectsInfo); err != nil { // Load subjects info from file
-		panic(err)
-	}
-
-	// use the subjectsInfo array (from .csv file)
-	// to populate the cfItems conceptKeywords and educationLevel fields
-	cfItems.loadSubjectsInfo(subjectsInfo, subjects)
 
 	// now use the parent child relationships in the subjects.json
 	// to generate CASE "isChildOf" associations
@@ -242,9 +254,10 @@ func main() {
 
 	caseJSONFileName := baseName + "_case.json"
 	caseJSON, err := json.Marshal(cfPackage)
-	fmt.Println("Writing CASE to " + caseJSONFileName)
 	err = ioutil.WriteFile(caseJSONFileName, caseJSON, 0644)
 	if err != nil {
-		panic(err)
+		log.WithFields(log.Fields{"file": caseJSONFileName}).Fatal("Can't write CASE file")
+	} else {
+		log.WithFields(log.Fields{"file": caseJSONFileName}).Info("Stored CFPackage to file")
 	}
 }
