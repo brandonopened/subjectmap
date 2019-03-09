@@ -1,6 +1,13 @@
-# SubjectMap
-Converts an LTI Resource Search subject taxonomy to CASE expressed taxonomy.  This is a multistage process of converting the LTI Resource Search expressed taxonomy as CASE to be handled in OpenSALT.  Then other code will handle two taxonomies available in OpenSALT and suggest possible associations.
+# subjectMap
+A set of utilities for performing subjectgi to skill mappings
 
-## LTISearchSubjectsToCASE.GO
+## subjectsToCASE.GO
 
-Converts a list of subjects that is an LTI Resource Search payload into a CASE expressed taxonomy to be loaded into OpenSALT
+Loads JSON file with a subject taxonomy expressed in IMS Global LTI Resource Search. Subjects taxonomy payload format
+
+Saves as valid IMS Global CASE format, which can be loaded into any CASE compliantskill/standards manager
+
+Generates <basename>_case.json file
+
+Usage:
+   go run subjectsToCASE.go <subjects basename file> <base URI to use>
