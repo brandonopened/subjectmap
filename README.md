@@ -9,4 +9,4 @@ Loads JSON file with a subject taxonomy expressed in [IMS Global LTI Resource Se
 Saves as valid [IMS Global CASE](http://www.imsglobal.org/activity/case) format,which can be loaded into any CASE compliantskill/standards manager such as [OpenSALT](http://opensalt.org). Specifically generates <basename>_case.json file with valid CASE to load into OpenSALT. 
 
 Usage:
-   go run subjectsToCASE.go <subjects basename file> <base URI to use in generating URIs>
+   go run subjectsToCASE.go [subjects basename file] [base URI to use in generating URIs]
