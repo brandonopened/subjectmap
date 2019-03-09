@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -51,7 +52,7 @@ type SubjectInfo struct {
 	NodeResources           string `csv:"Node Resources"`
 	HierarachyNodeResources string `csv:"Node Resources"`
 	Grades                  string `csv:"Grades"`
-	Keyword                 string `csv:"Keywords"`
+	Keyword                 string `csv:"Keyword"`
 	NodeLineage             string `csv:"Node Lineage"`
 }
 
@@ -62,14 +63,14 @@ type CFItems struct {
 
 // CFItem struct
 type CFItem struct {
-	URI                string `json:"uri"`
-	HumanCodingScheme  string `json:"humanCodingScheme"`
-	CFDocumentURI      string `json:"CFDocumentURI"`
-	Identifier         string `json:"identifier"`
-	FullStatement      string `json:"fullStatement"`
-	ConceptKeywords    string `json:"conceptKeywords"`
-	EducationLevel     string `json:"educationLevel"`
-	LastChangeDateTime string `json:"lastChangeDateTime"`
+	URI                string   `json:"uri"`
+	HumanCodingScheme  string   `json:"humanCodingScheme"`
+	CFDocumentURI      string   `json:"CFDocumentURI"`
+	Identifier         string   `json:"identifier"`
+	FullStatement      string   `json:"fullStatement"`
+	ConceptKeywords    string   `json:"conceptKeywords"`
+	EducationLevel     []string `json:"educationLevel"`
+	LastChangeDateTime string   `json:"lastChangeDateTime"`
 }
 
 // LinkGenURI struct
@@ -103,15 +104,15 @@ type LinkGenURI struct {
 	},
 	"sequenceNumber": 1
   },
-  */
+*/
 type CFAssociation struct {
-	URI                	string    	`json:"uri"`
-	Identifier			string 	   	`json:"identifier"`
-	CFDocumentURI 		LinkGenURI	`json:"CFDocumentURI"`
-	OriginNodeURI     	LinkGenURI	`json:"originNodeURI"`
-	DestinationNodeURI 	LinkGenURI	`json:"destinationNodeURI"`
-	AssociationType    	string    	`json:"associationType"`
-	sequenceNumber		int		 	`json:"associationType"`
+	URI                string     `json:"uri"`
+	Identifier         string     `json:"identifier"`
+	CFDocumentURI      LinkGenURI `json:"CFDocumentURI"`
+	OriginNodeURI      LinkGenURI `json:"originNodeURI"`
+	DestinationNodeURI LinkGenURI `json:"destinationNodeURI"`
+	AssociationType    string     `json:"associationType"`
+	SequenceNumber     int        `json:"sequenceNumber"`
 }
 
 // CFAssociations struct
@@ -145,7 +146,8 @@ func (m *CFItems) loadSubjects(subjects Subjects, uriPrefix string, cfDocumentUR
 		cfItem.LastChangeDateTime = fmt.Sprintf("%d-%02d-%02dT%02d:%02d:%02d+00:00",
 			t.Year(), t.Month(), t.Day(),
 			t.Hour(), t.Minute(), t.Second())
-
+		cfItem.EducationLevel = make([]string, 0)
+		cfItem.ConceptKeywords = ""
 		m.CFItems[v.Identifier] = cfItem
 	}
 	return len(m.CFItems)
@@ -157,8 +159,15 @@ func (m *CFItems) loadSubjectsInfo(subjectsInfo SubjectsInfo, subjects Subjects)
 	var i CFItem
 	for _, v := range subjectsInfo.SubjectsInfo {
 		i = m.CFItems[v.NodeID]
-		i.ConceptKeywords = v.Keyword
-		i.EducationLevel = v.Grades
+		if v.Grades != "" {
+			educationLevel := strings.Split(v.Grades, ",")
+			if (len(educationLevel) > 0) {
+				i.EducationLevel = educationLevel
+			}
+		}
+		if v.Keyword != "" {
+			i.ConceptKeywords = v.Keyword
+		}
 		m.CFItems[v.NodeID] = i
 	}
 }
@@ -168,28 +177,28 @@ func (m *CFItems) loadSubjectsInfo(subjectsInfo SubjectsInfo, subjects Subjects)
 // this is a sample top level isChildOf from ACT Holistic Framework Math
 // NOTE THAT WE CREATE ISCHILDOF OF THE CFDOCUMENT IDENTIFIER
 /*
-    {
-      "uri": "http://frameworks.act.org/uri/8e87f5ca-3bbc-11e9-8a0b-dd5472351291",
-      "identifier": "8e87f5ca-3bbc-11e9-8a0b-dd5472351291",
-      "lastChangeDateTime": "2019-03-01T00:54:24+00:00",
-      "CFDocumentURI": {
-        "title": "ACT Holistic Framework - Mathematics V2.0",
-        "identifier": "8b5f90a6-3bbc-11e9-9fd0-97d95d55a29f",
-        "uri": "http://frameworks.act.org/uri/8b5f90a6-3bbc-11e9-9fd0-97d95d55a29f"
-      },
-      "originNodeURI": {
-        "title": "H.A.MATH.NQ",
-        "identifier": "01befe44-bc4c-11e8-a572-0242ac120003",
-        "uri": "http://frameworks.act.org/uri/01befe44-bc4c-11e8-a572-0242ac120003"
-      },
-      "associationType": "isChildOf",
-      "destinationNodeURI": {
-        "title": "ACT Holistic Framework - Mathematics V2.0",
-        "identifier": "8b5f90a6-3bbc-11e9-9fd0-97d95d55a29f",
-        "uri": "http://frameworks.act.org/uri/8b5f90a6-3bbc-11e9-9fd0-97d95d55a29f"
-      },
-      "sequenceNumber": 1
-    },
+   {
+     "uri": "http://frameworks.act.org/uri/8e87f5ca-3bbc-11e9-8a0b-dd5472351291",
+     "identifier": "8e87f5ca-3bbc-11e9-8a0b-dd5472351291",
+     "lastChangeDateTime": "2019-03-01T00:54:24+00:00",
+     "CFDocumentURI": {
+       "title": "ACT Holistic Framework - Mathematics V2.0",
+       "identifier": "8b5f90a6-3bbc-11e9-9fd0-97d95d55a29f",
+       "uri": "http://frameworks.act.org/uri/8b5f90a6-3bbc-11e9-9fd0-97d95d55a29f"
+     },
+     "originNodeURI": {
+       "title": "H.A.MATH.NQ",
+       "identifier": "01befe44-bc4c-11e8-a572-0242ac120003",
+       "uri": "http://frameworks.act.org/uri/01befe44-bc4c-11e8-a572-0242ac120003"
+     },
+     "associationType": "isChildOf",
+     "destinationNodeURI": {
+       "title": "ACT Holistic Framework - Mathematics V2.0",
+       "identifier": "8b5f90a6-3bbc-11e9-9fd0-97d95d55a29f",
+       "uri": "http://frameworks.act.org/uri/8b5f90a6-3bbc-11e9-9fd0-97d95d55a29f"
+     },
+     "sequenceNumber": 1
+   },
 */
 func (m *CFAssociations) loadChildren(subjects Subjects, cfItems CFItems, uriPrefix string, cfDocument CFDocument) int {
 	for _, v := range subjects.Subjects {
@@ -206,10 +215,10 @@ func (m *CFAssociations) loadChildren(subjects Subjects, cfItems CFItems, uriPre
 		orgURI.Title = cfItems.CFItems[v.Identifier].FullStatement
 		var destURI LinkGenURI
 		var destItem CFItem
-		if (v.Parent=="0") {
+		if v.Parent == "0" {
 			destURI.Identifier = cfDocument.Identifier
 			destURI.URI = cfDocument.URI
-			destURI.Title = cfDocument.Title 
+			destURI.Title = cfDocument.Title
 		} else {
 			destItem = cfItems.CFItems[v.Parent]
 			destURI.Identifier = destItem.Identifier
@@ -229,10 +238,9 @@ func (m *CFAssociations) loadChildren(subjects Subjects, cfItems CFItems, uriPre
 		cfAssociation.OriginNodeURI = orgURI
 		cfAssociation.DestinationNodeURI = destURI
 		cfAssociation.AssociationType = "isChildOf"
-		// TODO: computer sequence number
+		// TODO: compute sequence number
 		//cfAssociation.sequenceNumber = 1
 		m.CFAssociations = append(m.CFAssociations, cfAssociation)
-
 
 	}
 	return len(m.CFAssociations)
@@ -334,7 +342,7 @@ func main() {
 	// now use the parent child relationships in the subjects.json
 	// to generate CASE "isChildOf" associations
 	var cfAssociations CFAssociations
-	cfAssociations.loadChildren(subjects, cfItems, uriPrefix,cfDocument)
+	cfAssociations.loadChildren(subjects, cfItems, uriPrefix, cfDocument)
 
 	var cfPackage CFPackage
 	cfPackage.CFDocument = cfDocument
@@ -342,7 +350,7 @@ func main() {
 	cfPackage.CFAssociations = cfAssociations.CFAssociations
 
 	caseJSONFileName := baseName + "_case.json"
-	caseJSON, err := json.MarshalIndent(cfPackage,"","    ")
+	caseJSON, err := json.MarshalIndent(cfPackage, "", "    ")
 	err = ioutil.WriteFile(caseJSONFileName, caseJSON, 0644)
 	if err != nil {
 		log.WithFields(log.Fields{"file": caseJSONFileName}).Fatal("Can't write CASE file")
