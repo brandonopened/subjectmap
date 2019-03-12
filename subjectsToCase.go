@@ -20,11 +20,12 @@ import (
 	"os"
 	"strings"
 	"time"
+	"crypto/rand"
 
 	log "github.com/sirupsen/logrus"
 
 	"github.com/gocarina/gocsv"
-	"github.com/gofrs/uuid"
+	uuid "github.com/satori/uuid"
 )
 
 // Subjects struct
@@ -68,7 +69,7 @@ type CFItem struct {
 	CFDocumentURI      string   `json:"CFDocumentURI"`
 	Identifier         string   `json:"identifier"`
 	FullStatement      string   `json:"fullStatement"`
-	ConceptKeywords    string   `json:"conceptKeywords"`
+	ConceptKeywords    []string  `json:"conceptKeywords"`
 	EducationLevel     []string `json:"educationLevel"`
 	LastChangeDateTime string   `json:"lastChangeDateTime"`
 }
@@ -120,14 +121,24 @@ type CFAssociations struct {
 	CFAssociations []CFAssociation
 }
 
+func random() (string,error) {
+	result := make([]byte,10)
+	_, err := rand.Read(result)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("Can't generate random string")
+		return string(result[:10]),err
+	}
+	return string(result[:10]),nil
+}
+
 func (m *CFItems) loadSubjects(subjects Subjects, uriPrefix string, cfDocumentURI string) int {
 	m.CFItems = make(map[string]CFItem)
 	for _, v := range subjects.Subjects {
 		var cfItem CFItem
-		id, err := uuid.NewV4()
-		if err != nil {
-			log.WithFields(log.Fields{"err": err.Error}).Info("No GUID for subject")
-		}
+		var name string
+		randomSuffix,_ := random()
+		name = "http://frameworks.act.org/CFDocument/" + cfDocumentURI + "/CFItems/" + v.Name + "/" + v.Identifier + "/" + randomSuffix
+		id := uuid.NewV5(uuid.NamespaceDNS, name) 
 
 		cfItem.Identifier = id.String()
 		if len(v.Name) < 1 {
@@ -147,7 +158,7 @@ func (m *CFItems) loadSubjects(subjects Subjects, uriPrefix string, cfDocumentUR
 			t.Year(), t.Month(), t.Day(),
 			t.Hour(), t.Minute(), t.Second())
 		cfItem.EducationLevel = make([]string, 0)
-		cfItem.ConceptKeywords = ""
+		cfItem.ConceptKeywords = make([]string, 0)
 		m.CFItems[v.Identifier] = cfItem
 	}
 	return len(m.CFItems)
@@ -166,7 +177,7 @@ func (m *CFItems) loadSubjectsInfo(subjectsInfo SubjectsInfo, subjects Subjects)
 			}
 		}
 		if v.Keyword != "" {
-			i.ConceptKeywords = v.Keyword
+			i.ConceptKeywords=append(i.ConceptKeywords, v.Keyword)
 		}
 		m.CFItems[v.NodeID] = i
 	}
@@ -228,10 +239,10 @@ func (m *CFAssociations) loadChildren(subjects Subjects, cfItems CFItems, uriPre
 
 		var cfAssociation CFAssociation
 
-		id, err := uuid.NewV4()
-		if err != nil {
-			log.WithFields(log.Fields{"err": err.Error}).Info("Can't get UUID for association")
-		}
+		randomSuffix,_ := random()
+		name := "http://frameworks.act.org/CFDocument/" + cfDocument.Identifier + "/CFAssociations/" + orgURI.Identifier + "/" + destURI.Identifier + "/" + randomSuffix
+		id := uuid.NewV5(uuid.NamespaceDNS, name)
+
 		cfAssociation.URI = uriPrefix + "/cfAssociations/" + id.String()
 		cfAssociation.Identifier = id.String()
 		cfAssociation.CFDocumentURI = cfDocumentURI
@@ -259,11 +270,10 @@ type CFDocument struct {
 
 // Init ... set up the CFDocument structure
 func (m *CFDocument) Init(uriPrefix string, baseName string) {
+	randomSuffix,_ := random()
+	name := "http://frameworks.act.org/CFDocuments/" + baseName + "/" + randomSuffix
 
-	id, err := uuid.NewV4()
-	if err != nil {
-		log.WithFields(log.Fields{"err": err.Error}).Info("No GUID for subject")
-	}
+	id := uuid.NewV5(uuid.NamespaceDNS, name)
 
 	m.URI = uriPrefix + "/CFDocuments/" + id.String()
 	m.CFPackageURI = uriPrefix + "/CFPackages/" + id.String()
@@ -271,14 +281,17 @@ func (m *CFDocument) Init(uriPrefix string, baseName string) {
 	m.Creator = "subjectsToCase"
 	m.Title = baseName
 	m.Description = baseName
-	m.LastChangeDateTime = time.Now().Format("YYYY-MM-DD hh:mm:ss")
+	t := time.Now()
+	m.LastChangeDateTime = fmt.Sprintf("%d-%02d-%02dT%02d:%02d:%02d+00:00",
+		t.Year(), t.Month(), t.Day(),
+		t.Hour(), t.Minute(), t.Second())
 }
 
 // CFPackage struct
 type CFPackage struct {
-	CFDocument     CFDocument        `json:"CFDocument"`
-	CFItems        map[string]CFItem `json:"CFItems"`
-	CFAssociations []CFAssociation   `json:"CFAssociations"`
+	CFDocument     CFDocument       `json:"CFDocument"`
+	CFItems        []CFItem 		`json:"CFItems"`
+	CFAssociations []CFAssociation  `json:"CFAssociations"`
 }
 
 func main() {
@@ -346,7 +359,10 @@ func main() {
 
 	var cfPackage CFPackage
 	cfPackage.CFDocument = cfDocument
-	cfPackage.CFItems = cfItems.CFItems
+	cfPackage.CFItems = make([]CFItem, 0, len(cfItems.CFItems))
+	for _, val := range cfItems.CFItems {
+   		cfPackage.CFItems = append(cfPackage.CFItems, val)
+	}
 	cfPackage.CFAssociations = cfAssociations.CFAssociations
 
 	caseJSONFileName := baseName + "_case.json"
