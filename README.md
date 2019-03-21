@@ -10,7 +10,7 @@ Saves as valid [IMS Global CASE](http://www.imsglobal.org/activity/case) format,
 
 Usage:
 ```
-go run subjectsToCASE.go [subjects basename file] [base URI to use in generating URIs]
+go run subjectsToCASE.go <subjects basename file> [base URI to use in generating URIs]
 ```
    
 ## suggestMap.go
@@ -19,5 +19,7 @@ Takes an argument of CASE item identifier (for a subject, skill or standard) and
 
 Usage:
 ```
-go run suggestMap.go [identifier of item to find similar items for|CFDocumentURI of full taxonomy to find matches for] [CFDocumentURI to restrict candidate searches to]
+go run suggestMap.go
+  <identifier of item to find similar items for>|<CFDocumentURI of full taxonomy to find matches for>
+  [CFDocumentURI to restrict candidate searches to]
 ```
