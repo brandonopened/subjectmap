@@ -20,6 +20,6 @@ Takes an argument of CASE item identifier (for a subject, skill or standard) and
 Usage:
 ```
 go run suggestMap.go
-  <identifier of item to find similar items for>|<CFDocumentURI of full taxonomy to find matches for>
-  [CFDocumentURI to restrict candidate searches to]
+  <identifier of item to find similar items for OR identifier full taxonomy CFDocument to find matches for>
+  [optional identifier of taxonomy (document) to restrict suggestions to]
 ```
