@@ -14,13 +14,15 @@
 package main
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
 	"time"
-	"crypto/rand"
+	//"database/sql"
+	//"github.com/go-sql-driver/mysql"
 
 	log "github.com/sirupsen/logrus"
 
@@ -69,7 +71,7 @@ type CFItem struct {
 	CFDocumentURI      string   `json:"CFDocumentURI"`
 	Identifier         string   `json:"identifier"`
 	FullStatement      string   `json:"fullStatement"`
-	ConceptKeywords    []string  `json:"conceptKeywords"`
+	ConceptKeywords    []string `json:"conceptKeywords"`
 	EducationLevel     []string `json:"educationLevel"`
 	LastChangeDateTime string   `json:"lastChangeDateTime"`
 }
@@ -121,14 +123,14 @@ type CFAssociations struct {
 	CFAssociations []CFAssociation
 }
 
-func random() (string,error) {
-	result := make([]byte,10)
+func random() (string, error) {
+	result := make([]byte, 10)
 	_, err := rand.Read(result)
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("Can't generate random string")
-		return string(result[:10]),err
+		return string(result[:10]), err
 	}
-	return string(result[:10]),nil
+	return string(result[:10]), nil
 }
 
 func (m *CFItems) loadSubjects(subjects Subjects, uriPrefix string, cfDocumentURI string) int {
@@ -136,15 +138,15 @@ func (m *CFItems) loadSubjects(subjects Subjects, uriPrefix string, cfDocumentUR
 	for _, v := range subjects.Subjects {
 		var cfItem CFItem
 		var name string
-		randomSuffix,_ := random()
+		randomSuffix, _ := random()
 		name = "http://frameworks.act.org/CFDocument/" + cfDocumentURI + "/CFItems/" + v.Name + "/" + v.Identifier + "/" + randomSuffix
-		id := uuid.NewV5(uuid.NamespaceDNS, name) 
+		id := uuid.NewV5(uuid.NamespaceDNS, name)
 
 		cfItem.Identifier = id.String()
 		if len(v.Name) < 1 {
 			v.Name = "(Unknown)"
 		}
-		const MaxHumanCodingScheme = 10
+		const MaxHumanCodingScheme = 50
 		if len(v.Name) > MaxHumanCodingScheme {
 			cfItem.HumanCodingScheme = v.Name[0 : MaxHumanCodingScheme-1]
 		} else {
@@ -172,12 +174,13 @@ func (m *CFItems) loadSubjectsInfo(subjectsInfo SubjectsInfo, subjects Subjects)
 		i = m.CFItems[v.NodeID]
 		if v.Grades != "" {
 			educationLevel := strings.Split(v.Grades, ",")
-			if (len(educationLevel) > 0) {
+			if len(educationLevel) > 0 {
 				i.EducationLevel = educationLevel
 			}
 		}
 		if v.Keyword != "" {
-			i.ConceptKeywords=append(i.ConceptKeywords, v.Keyword)
+			keywords := strings.Split(v.Keyword, "|")
+			i.ConceptKeywords = append(i.ConceptKeywords, keywords...)
 		}
 		m.CFItems[v.NodeID] = i
 	}
@@ -239,7 +242,7 @@ func (m *CFAssociations) loadChildren(subjects Subjects, cfItems CFItems, uriPre
 
 		var cfAssociation CFAssociation
 
-		randomSuffix,_ := random()
+		randomSuffix, _ := random()
 		name := "http://frameworks.act.org/CFDocument/" + cfDocument.Identifier + "/CFAssociations/" + orgURI.Identifier + "/" + destURI.Identifier + "/" + randomSuffix
 		id := uuid.NewV5(uuid.NamespaceDNS, name)
 
@@ -270,7 +273,7 @@ type CFDocument struct {
 
 // Init ... set up the CFDocument structure
 func (m *CFDocument) Init(uriPrefix string, baseName string) {
-	randomSuffix,_ := random()
+	randomSuffix, _ := random()
 	name := "http://frameworks.act.org/CFDocuments/" + baseName + "/" + randomSuffix
 
 	id := uuid.NewV5(uuid.NamespaceDNS, name)
@@ -289,13 +292,15 @@ func (m *CFDocument) Init(uriPrefix string, baseName string) {
 
 // CFPackage struct
 type CFPackage struct {
-	CFDocument     CFDocument       `json:"CFDocument"`
-	CFItems        []CFItem 		`json:"CFItems"`
-	CFAssociations []CFAssociation  `json:"CFAssociations"`
+	CFDocument     CFDocument      `json:"CFDocument"`
+	CFItems        []CFItem        `json:"CFItems"`
+	CFAssociations []CFAssociation `json:"CFAssociations"`
 }
 
 func main() {
 	var err error
+
+
 
 	baseName := "math"
 	// first argument is basename of the JSON file with subjects
@@ -361,7 +366,7 @@ func main() {
 	cfPackage.CFDocument = cfDocument
 	cfPackage.CFItems = make([]CFItem, 0, len(cfItems.CFItems))
 	for _, val := range cfItems.CFItems {
-   		cfPackage.CFItems = append(cfPackage.CFItems, val)
+		cfPackage.CFItems = append(cfPackage.CFItems, val)
 	}
 	cfPackage.CFAssociations = cfAssociations.CFAssociations
 
