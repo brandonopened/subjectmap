@@ -9,7 +9,8 @@ Loads JSON file with a subject taxonomy expressed in [IMS Global LTI Resource Se
 Saves as valid [IMS Global CASE](http://www.imsglobal.org/activity/case) format,which can be loaded into any CASE compliantskill/standards manager such as [OpenSALT](http://opensalt.org). Specifically generates <basename>_case.json file with valid CASE to load into OpenSALT. 
 
 Usage:
-```go run subjectsToCASE.go [subjects basename file] [base URI to use in generating URIs]
+```
+go run subjectsToCASE.go [subjects basename file] [base URI to use in generating URIs]
 ```
    
 ## suggestMap.go
@@ -17,5 +18,6 @@ Usage:
 Takes an argument of CASE item identifier (for a subject, skill or standard) and generates a CSV file with proposed related CASE item identifiers in order of relevance. It uses the [Levenshtein distance](https://en.wikipedia.org/wiki/Levenshtein_distance#Recursive) to rank the similarity.  
 
 Usage:
-```go run sugggestMap.go [identifier of item to find similar items for]
+```
+go run sugggestMap.go [identifier of item to find similar items for]
 ```
